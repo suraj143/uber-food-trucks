@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <title>Locate San Francisco Food Trucks</title>
+        <link rel="stylesheet" type="text/css" href="http://yui.yahooapis.com/2.9.0/build/reset-fonts-grids/reset-fonts-grids.css">
+        <link rel="stylesheet" type="text/css" href="http://yui.yahooapis.com/2.9.0/build/base/base-min.css">
+        <link rel="stylesheet" type="text/css" href="http://yui.yahooapis.com/2.9.0/build/button/assets/skins/sam/button.css">
+        <style type="text/css">
+        
+            body {
+                font-size: 110%;
+            }
+            
+            #map {
+                height: 600px;
+                width: 100%;
+                border: 1px solid #333;
+            }
+        </style>
+    </head>
+    <body class="yui-skin-sam"> 
+        <div id="doc3" class="yui-t4"> 
+            <div id="hd">
+                <h1>Locate San Francisco Food Trucks</h1>
+                <p>
+                    Use this map to find which San Francisco Food Trucks could be nearby.
+                </p>
+            </div>
+            <div id="bd">
+                <div id="yui-main">
+                    <div class="yui-b">
+                        <div class="yui-g"> 
+                            <div id="map"></div>
+                        </div> 
+                    </div> 
+                </div> 
+                <div class="yui-b">
+                    <input id="refresh_btn" name="refresh_btn" type="button" value="Refresh on Current Map" />
+                </div>
+            </div>
+        </div>
+        <script type="text/javascript" src="http://maps.googleapis.com/maps/api/js?sensor=true"></script>
+        <script type="text/javascript" src="http://yui.yahooapis.com/2.9.0/build/yuiloader/yuiloader-min.js"></script>
+        <script type="text/javascript">
+            
+            function outer_init() {
+                
+                var mapObj;
+                var allMarkers = new Array();
+                var currentInfo = null;
+
+                // class constructor for placing Food Truck markers into "allMarkers" and "mapObj"
+                function FoodTruck(data, map) {
+
+                    // this object's marker
+                    var marker = null;
+
+                    var markerOpts = {};
+                    markerOpts.map = map;
+
+                    var infoElmt = document.createElement("div");
+
+                    var truckName = data.applicant;
+                    if (undefined !== truckName && null !== truckName) {
+                        markerOpts.title = truckName;
+                        var titleElmt = document.createElement("div");
+                        titleElmt.textContent = truckName;
+                        infoElmt.appendChild(titleElmt);
+                    }
+
+                    var truckAddr = data.address;
+                    if (undefined !== truckAddr && null !== truckAddr) {
+                        var addressElmt = document.createElement("div");
+                        addressElmt.textContent = truckAddr;
+                        infoElmt.appendChild(addressElmt);
+                    }
+
+                    var truckLink = data.schedule;
+                    if (undefined !== truckLink && null !== truckLink) {
+                        var linkElmt = document.createElement("a");
+                        linkElmt.textContent = "View Schedule";
+                        linkElmt.setAttribute("href",truckLink);
+                        linkElmt.setAttribute("target","_blank");
+                        infoElmt.appendChild(linkElmt);
+                    }                        
+
+                    var lat = data.latitude;
+                    var lng = data.longitude;
+
+                    // create marker display element and add it to the map
+                    if (undefined !== lat && null !== lat &&
+                        undefined !== lng && null !== lng) {
+                        markerOpts.position = new google.maps.LatLng(lat,lng);
+                        marker = new google.maps.Marker(markerOpts);
+                        allMarkers.push(marker);
+                    }
+
+                    var infoOptions = {
+                        content: infoElmt
+                    };
+                    var info = new google.maps.InfoWindow(infoOptions);
+
+                    // marker click event handler
+                    function showInfo(e) {
+                        // close the previous infowindow
+                        if (null !== currentInfo) {
+                            currentInfo.close();
+                        }
+                        info.open(map,marker);
+                        currentInfo = info;
+                    }
+
+                    google.maps.event.addListener(marker,"click",showInfo);
+
+                }
+
+                // a call function to handle a successful data query
+                function dataSuccess(o) {
+                    var info = YAHOO.lang.JSON.parse(o.responseText);
+                    if (undefined !== info && null !== info && Array.isArray(info)) {
+                        // remove the previous entries
+                        for (var i in allMarkers) {
+                            var marker = allMarkers[i];
+                            marker.setMap(null);
+                        }
+                        allMarkers = new Array();
+
+                        // add new entries for the data returned
+                        for (var i in info) {
+                            new FoodTruck(info[i],mapObj);
+                        }
+                    }
+                }
+
+                function dataFailure(o) {
+
+                }
+
+                var dataCallback = {
+                    success: dataSuccess,
+                    failure: dataFailure
+                };
+
+                // initiate an asynchronous request for json Food Truck data
+                //  from the API proxy
+                function initiateLocateTrucks(e) {
+                    var query = "/find_trucks?";
+
+                    // get the map boundaries for the query
+                    var boundsObj = mapObj.getBounds();
+                    var northeast = boundsObj.getNorthEast();
+                    var southwest = boundsObj.getSouthWest();
+                    var north = northeast.lat();
+                    var south = southwest.lat();
+                    var east = northeast.lng();
+                    var west = southwest.lng();
+
+                    query += "north="+north;
+                    query += "&south="+south;
+                    query += "&east="+east;
+                    query += "&west="+west;
+
+                    var request = YAHOO.util.Connect.asyncRequest('GET', query, dataCallback);
+                }
+                
+                // initialize mapObj from options
+                function initializeMap(options) {
+                    mapObj = new google.maps.Map(document.getElementById('map'), options);
+
+                    // wait until the first time the map is loaded to find the trucks
+                    google.maps.event.addListenerOnce(mapObj,'idle',initiateLocateTrucks);
+                }
+
+                // callback function for when geolocation data is supported and available
+                function positionCallback(position) {
+
+                    var mapCenter = new google.maps.LatLng(position.coords.latitude,position.coords.longitude);
+                    var mapOptions = {
+                        mapTypeId: google.maps.MapTypeId.ROADMAP,
+                        center: mapCenter,
+                        zoom: 17
+                    };
+
+                    initializeMap(mapOptions);
+                }
+
+                // function to call to initialize mapObj in case location is not available or unsupported
+                function positionDefault(info) {
+                    // default someplace.  How about San Francisco?
+                    var mapCenter = new google.maps.LatLng(37.775, -122.418333333333);
+                    var mapOptions = {
+                        mapTypeId: google.maps.MapTypeId.ROADMAP,
+                        center: mapCenter,
+                        zoom: 17
+                    };
+
+                    initializeMap(mapOptions);
+                }
+
+                function getLocation() {
+                    if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(positionCallback,positionDefault);
+                    } else {
+                        positionDefault();
+                    }
+                }
+                
+                function inner_init() {
+
+                    // have a control button to load truck data on the map
+                    var refreshBtn = new YAHOO.widget.Button("refresh_btn");
+                    refreshBtn.on("click",initiateLocateTrucks);
+
+                    getLocation();
+                    //positionDefault();
+                    
+                }
+            
+                YAHOO.util.Event.onDOMReady(inner_init);
+            }
+
+            var loadData = {
+                base: "http://yui.yahooapis.com/2.9.0/build/",
+                require: ["button","connectioncore","event","json",],
+                loadOptional: false,
+                combine: true,
+                filter: "MIN",
+                allowRollup: true,
+                onSuccess: outer_init
+            };
+            var loader = new YAHOO.util.YUILoader(loadData);
+            loader.insert();
+        </script>
+    </body>
+</html>
