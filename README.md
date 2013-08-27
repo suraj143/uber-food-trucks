@@ -3,10 +3,6 @@ uber-food-trucks
 This web app implements the "Food trucks" Uber coding challenge described here:
 https://github.com/uber/coding-challenge-tools
 
-As of 8/13/2013, the application can be accessed at
-http://jonhyler.com.
-Note that it uses a free cloud hosting service, which means an initial visit may take a bit longer than expected.
-
 The application makes Food Truck data available on a visual map interface.  The user is free to move the map and initiate a request for data in a different area.  The map is initially place where the user’s browser geolocates him, or in San Francisco, if this information is unavailable.  Using browser geolocation was new to me.
 
 The application contains two components: a front-end html file, and a back-end Java servlet.  Both run on a single Tomcat server.  The front-end interface utilizes the Google Maps API to display data visually.  It makes requests to the back-end servlet, which proxies them to obtain data from the SFData.org Food Trucks API.
